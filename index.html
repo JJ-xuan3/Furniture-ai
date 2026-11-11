@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#2A241E" />
+<title>家具 AI 辨識</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232A241E'/%3E%3Cpath d='M14 30h36v6H14z' fill='%23C0793A'/%3E%3Cpath d='M17 36v10M47 36v10' stroke='%23C0793A' stroke-width='3'/%3E%3Cpath d='M22 24h20l3 6H19z' fill='%23E8C79C'/%3E%3C/svg%3E" />
+<style>
+:root{
+  --bg:#F2EEE7; --card:#FFFDF9; --ink:#241F1A; --muted:#7B7167;
+  --line:#E4DCD1; --accent:#A9611F; --accent-dark:#7E4514; --accent-soft:#F9EDDD;
+  --ok:#3F6B4F; --warn:#9A5B14; --bad:#A33A2C;
+  --radius:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+.app{max-width:520px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column}
+
+/* ---------- 頂部 ---------- */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:18px 18px 14px;background:#2A241E;color:#F6F1E8;
+}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.mark{width:38px;height:38px;border-radius:11px;background:#3B322A;display:grid;place-items:center;flex:0 0 auto}
+.brand h1{margin:0;font-size:17px;font-weight:700;letter-spacing:.02em}
+.brand p{margin:1px 0 0;font-size:12px;color:#B9AC9C;letter-spacing:.01em}
+.icon-btn{
+  width:40px;height:40px;border-radius:10px;border:0;background:transparent;color:#E9E0D3;
+  display:grid;place-items:center;cursor:pointer;flex:0 0 auto;
+}
+.icon-btn:active{background:#3B322A}
+
+/* ---------- 分頁 ---------- */
+.tabs{display:flex;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.tab{
+  flex:1;border:0;background:transparent;padding:13px 0 11px;font-size:14.5px;font-family:inherit;
+  color:var(--muted);cursor:pointer;position:relative;font-weight:500;
+}
+.tab.active{color:var(--accent-dark);font-weight:700}
+.tab.active::after{content:"";position:absolute;left:50%;transform:translateX(-50%);bottom:-1px;width:46%;height:2px;background:var(--accent);border-radius:2px}
+.tab .badge{
+  display:inline-block;min-width:18px;padding:0 5px;margin-left:5px;border-radius:9px;
+  background:#EDE6DB;color:#6B6157;font-size:11px;line-height:18px;font-weight:600;vertical-align:1px;
+}
+
+main{padding:16px 18px 26px;flex:1}
+.view{display:block}
+.view[hidden]{display:none}
+
+/* ---------- 提示卡 ---------- */
+.tip{
+  display:flex;gap:11px;background:var(--accent-soft);border:1px solid #EFD9BE;
+  border-radius:13px;padding:12px 13px;font-size:13px;color:#7A4A17;line-height:1.55;
+}
+.tip svg{flex:0 0 auto;margin-top:2px;color:#A9611F}
+
+/* ---------- 照片格 ---------- */
+.sec-label{display:flex;align-items:baseline;justify-content:space-between;margin:20px 0 9px}
+.sec-label h2{margin:0;font-size:13px;font-weight:700;color:var(--ink);letter-spacing:.02em}
+.sec-label span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.slots{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.slot{
+  position:relative;aspect-ratio:1/1;border-radius:12px;background:var(--card);
+  border:1px dashed #D9CFC1;display:grid;place-items:center;cursor:pointer;overflow:hidden;
+  color:#B0A395;transition:border-color .15s,background .15s;
+}
+.slot:active{border-color:var(--accent);background:#FFF8EF}
+.slot.filled{border:1px solid var(--line);cursor:default}
+.slot img{width:100%;height:100%;object-fit:cover;display:block}
+.slot .no{position:absolute;left:5px;top:5px;font-size:10px;background:rgba(36,31,26,.72);color:#fff;border-radius:5px;padding:1px 5px;font-weight:600}
+.slot .del{
+  position:absolute;right:4px;top:4px;width:26px;height:26px;border-radius:50%;border:0;
+  background:rgba(36,31,26,.7);color:#fff;display:grid;place-items:center;cursor:pointer;padding:0;
+}
+.slot .del svg{width:12px;height:12px}
+.slot .a4{position:absolute;left:5px;bottom:4px;font-size:9.5px;color:#fff;background:rgba(63,107,79,.85);border-radius:4px;padding:1px 4px}
+
+/* ---------- 按鈕 ---------- */
+.btn{
+  border:0;border-radius:12px;font-family:inherit;font-size:15px;font-weight:600;
+  padding:13px 16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;
+  transition:opacity .15s,background .15s,transform .06s;
+}
+.btn:active{transform:scale(.985)}
+.btn.primary{width:100%;background:var(--accent);color:#fff;margin-top:14px;box-shadow:0 1px 0 #8F4E15}
+.btn.primary:disabled{background:#CDBCA8;color:#F7F1E8;box-shadow:none;cursor:not-allowed;opacity:.85}
+.btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line);flex:1}
+.btn.ghost:active{background:#F7F2EA}
+.btn.small{padding:9px 13px;font-size:13px;border-radius:9px;white-space:nowrap}
+.btn.danger{background:transparent;color:var(--bad);border:1px solid #E6C9C3}
+.btn-row{display:flex;gap:9px;margin-top:10px}
+.hint{margin:10px 2px 0;font-size:12px;color:var(--muted);text-align:center}
+.hint b{color:var(--accent-dark);font-weight:600}
+
+/* ---------- 載入 ---------- */
+.loading{margin-top:16px;background:#2A241E;color:#F4EDE2;border-radius:14px;padding:20px 16px;text-align:center}
+.spinner{width:26px;height:26px;margin:0 auto 10px;border:2px solid rgba(255,255,255,.28);border-top-color:#E5B77E;border-radius:50%;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading p{margin:0;font-size:13.5px;color:#EFE4D4}
+.loading small{display:block;margin-top:5px;font-size:11.5px;color:#A99C8C}
+
+/* ---------- 結果 ---------- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-top:16px}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+.card-head h3{margin:0;font-size:16px;font-weight:700;letter-spacing:.02em}
+.pill{font-size:11.5px;padding:3px 9px;border-radius:20px;background:#EFE9DF;color:#6B6157;font-weight:600;white-space:nowrap}
+.pill.ok{background:#E6EFE7;color:var(--ok)}
+.pill.warn{background:#FAEBD8;color:var(--warn)}
+.pill.bad{background:#F6E2DE;color:var(--bad)}
+.rows{margin-top:10px;border-top:1px solid var(--line)}
+.row{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid #F1EAE1;align-items:flex-start}
+.row:last-child{border-bottom:0;padding-bottom:2px}
+.row .k{flex:0 0 88px;font-size:13px;color:var(--muted);padding-top:1px}
+.row .v{flex:1;min-width:0;font-size:14.5px;font-weight:500;word-break:break-word;outline:none}
+.row .v:focus{background:#FFF6E9;box-shadow:inset 0 -1px 0 var(--accent)}
+.row .v.big{font-size:16px;font-weight:700}
+.row.desc .k{flex:0 0 88px}
+.row.desc .v{color:#5C5348;font-weight:400;font-size:13.5px;line-height:1.7}
+.unit{font-size:12px;color:var(--muted);font-weight:400}
+.note{margin:12px 0 0;font-size:11.5px;color:var(--muted);line-height:1.6}
+.edit-hint{font-size:11.5px;color:var(--muted);margin:8px 0 0}
+
+/* ---------- 歷史 ---------- */
+.hist-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px}
+.hist-head h2{margin:0;font-size:14px;font-weight:700}
+.hist-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.h-item{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:11px}
+.h-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.h-date{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.h-title{font-size:15px;font-weight:700;margin:2px 0 3px}
+.h-meta{font-size:12.5px;color:var(--muted);line-height:1.6}
+.h-imgs{display:flex;gap:6px;margin-top:9px;overflow-x:auto;padding-bottom:2px}
+.h-imgs img{width:54px;height:54px;object-fit:cover;border-radius:8px;flex:0 0 auto;border:1px solid var(--line)}
+.h-foot{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+.empty{text-align:center;padding:56px 20px;color:#A39787}
+.empty svg{opacity:.55;margin-bottom:10px}
+.empty p{margin:0;font-size:13.5px}
+
+/* ---------- 燈箱 ---------- */
+.lightbox{
+  position:fixed;inset:0;background:rgba(20,17,14,.92);display:none;place-items:center;z-index:60;padding:18px;
+}
+.lightbox.show{display:grid}
+.lightbox img{max-width:100%;max-height:80vh;border-radius:10px}
+.lightbox button{position:absolute;top:16px;right:16px;width:38px;height:38px;border-radius:50%;border:0;background:rgba(255,255,255,.14);color:#fff;cursor:pointer}
+
+/* ---------- 設定面板 ---------- */
+.overlay{position:fixed;inset:0;background:rgba(28,23,18,.48);display:none;z-index:50}
+.overlay.show{display:block}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:55;background:var(--card);
+  border-radius:20px 20px 0 0;max-height:88vh;overflow-y:auto;
+  transform:translateY(102%);transition:transform .26s ease;padding:8px 18px 24px;
+}
+.sheet.show{transform:translateY(0)}
+.sheet .grab{width:36px;height:4px;border-radius:3px;background:#D6CCBE;margin:6px auto 12px}
+.sheet h3{margin:0 0 4px;font-size:16px}
+.sheet .sub{margin:0 0 16px;font-size:12.5px;color:var(--muted)}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12.5px;font-weight:600;color:#5D5449;margin-bottom:6px}
+.field input,.field select{
+  width:100%;padding:11px 12px;font-size:16px;font-family:inherit;color:var(--ink);
+  background:#FBF7F0;border:1px solid var(--line);border-radius:10px;outline:none;
+}
+.field input:focus,.field select:focus{border-color:var(--accent);background:#fff}
+.seg{display:flex;background:#F2ECE2;border-radius:10px;padding:3px;gap:3px}
+.seg button{
+  flex:1;border:0;background:transparent;font-family:inherit;font-size:13px;font-weight:600;
+  padding:9px 6px;border-radius:8px;color:var(--muted);cursor:pointer;
+}
+.seg button.on{background:#fff;color:var(--accent-dark);box-shadow:0 1px 3px rgba(70,55,40,.12)}
+.sheet .note2{font-size:11.5px;color:var(--muted);line-height:1.6;background:#F8F3EA;border-radius:10px;padding:10px 12px}
+.sheet .btn.primary{margin-top:4px}
+.toast{
+  position:fixed;left:50%;transform:translate(-50%,20px);bottom:32px;z-index:80;
+  background:#241F1A;color:#F6F0E6;font-size:13px;padding:10px 16px;border-radius:22px;
+  opacity:0;pointer-events:none;transition:.22s;max-width:80vw;text-align:center;
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.err{
+  margin-top:12px;background:#FBE9E5;border:1px solid #EFCFC8;color:#8E3325;
+  border-radius:11px;padding:11px 13px;font-size:13px;line-height:1.55;
+}
+.err b{display:block;margin-bottom:2px}
+@media (min-width:520px){
+  body{background:#E8E2D9}
+  .app{box-shadow:0 0 0 1px var(--line);min-height:100vh}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#D89A5B" stroke-width="1.8" stroke-linecap="round">
+          <path d="M4 11h16M6 11v7M18 11v7M8.5 5.5h7l3 5.5H5.5z"/>
+        </svg>
+      </div>
+      <div>
+        <h1>家具 AI 辨識</h1>
+        <p>拍 4 張 · A4 比例尺 · 自動估算尺寸</p>
+      </div>
+    </div>
+    <button class="icon-btn" id="btnSettings" aria-label="設定">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-view="scan">掃描辨識</button>
+    <button class="tab" data-view="history">歷史紀錄 <span class="badge" id="histCount">0</span></button>
+  </nav>
+
+  <main>
+    <!-- ===== 掃描 ===== -->
+    <section id="view-scan" class="view">
+      <div class="tip">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M12 3a6.5 6.5 0 0 0-3.4 12v2.6a2 2 0 0 0 2 2h2.8a2 2 0 0 0 2-2V15A6.5 6.5 0 0 0 12 3Z"/>
+          <path d="M9.8 20.5h4.4"/>
+        </svg>
+        <span>把 <b>A4 白紙</b>貼平放在家具同一個平面一起入鏡，AI 會用 21×29.7cm 換算長寬高。最多 4 張，建議含正面與側面。</span>
+      </div>
+
+      <div class="sec-label">
+        <h2>已拍攝照片</h2>
+        <span id="photoCount">0 / 4</span>
+      </div>
+      <div class="slots" id="slots"></div>
+
+      <div class="btn-row">
+        <button class="btn ghost" id="btnCamera">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 8.5h3l1.4-2h7.2L17 8.5h3v10H4z"/><circle cx="12" cy="13" r="3.1"/></svg>
+          拍照
+        </button>
+        <button class="btn ghost" id="btnAlbum">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 15l4.5-4 4 3.5 3-2.5L20 16"/></svg>
+          從相簿選
+        </button>
+      </div>
+
+      <button class="btn primary" id="btnAnalyze" disabled>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/><path d="M18.5 15.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg>
+        開始 AI 辨識
+      </button>
+      <p class="hint" id="connHint">檢查連線方式中…</p>
+
+      <div class="loading" id="loading" hidden>
+        <div class="spinner"></div>
+        <p id="loadingText">AI 正在比對 A4 比例尺…</p>
+        <small>4 張照片通常需要 10–25 秒，請不要關閉畫面</small>
+      </div>
+
+      <div class="err" id="errBox" hidden></div>
+
+      <!-- 結果 -->
+      <div class="card" id="resultCard" hidden>
+        <div class="card-head">
+          <h3>辨識結果</h3>
+          <span class="pill" id="resPill">可正常使用</span>
+        </div>
+        <div class="rows">
+          <div class="row"><div class="k">家具類型</div><div class="v big" id="f_type" contenteditable="true"></div></div>
+          <div class="row"><div class="k">尺寸 長×寬×高</div><div class="v" id="f_size" contenteditable="true"></div></div>
+          <div class="row"><div class="k">主要材質</div><div class="v" id="f_material" contenteditable="true"></div></div>
+          <div class="row"><div class="k">瑕疵狀況</div><div class="v" id="f_defect" contenteditable="true"></div></div>
+          <div class="row desc"><div class="k">瑕疵說明</div><div class="v" id="f_desc" contenteditable="true"></div></div>
+        </div>
+        <p class="edit-hint">可以直接點欄位修改 AI 的判斷，儲存時一併寫入紀錄。</p>
+        <div class="btn-row">
+          <button class="btn primary" id="btnSave" style="margin:0">儲存這筆紀錄</button>
+          <button class="btn ghost" id="btnReset" style="flex:0 0 34%">重新掃描</button>
+        </div>
+        <p class="note">尺寸由 AI 依 A4 紙推算，誤差約 ±5–10cm，正式丈量請以捲尺為準。</p>
+      </div>
+    </section>
+
+    <!-- ===== 歷史 ===== -->
+    <section id="view-history" class="view" hidden>
+      <div class="hist-head">
+        <h2>辨識紀錄</h2>
+        <div class="hist-actions">
+          <button class="btn ghost small" id="btnExport">匯出 CSV</button>
+          <button class="btn ghost small" id="btnClearAll">清空</button>
+        </div>
+      </div>
+      <div id="historyList"></div>
+      <div class="empty" id="emptyState">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 15l5-4.5 4 3.5 3-2.5L20 16M10 9.5h.01"/></svg>
+        <p>尚無辨識紀錄<br/><span style="font-size:12px">完成一次辨識並儲存後會出現在這裡</span></p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<input type="file" id="inputCamera" accept="image/*" capture="environment" hidden />
+<input type="file" id="inputAlbum" accept="image/*" multiple hidden />
+
+<div class="lightbox" id="lightbox">
+  <button id="lbClose" aria-label="關閉">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </button>
+  <img id="lbImg" alt="預覽" />
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="sheet" id="sheet">
+  <div class="grab"></div>
+  <h3>連線設定</h3>
+  <p class="sub">金鑰只存在這台裝置的瀏覽器裡，不會上傳到任何地方。</p>
+
+  <div class="field">
+    <label>連線方式</label>
+    <div class="seg" id="segMode">
+      <button data-mode="auto" class="on">自動</button>
+      <button data-mode="direct">OpenAI 金鑰</button>
+      <button data-mode="server">自架伺服器</button>
+    </div>
+    <p class="note" style="margin-top:6px">自動：由本機開啟就直接呼叫 OpenAI；放在 Render 上就自動走自己的 /api/scan。</p>
+  </div>
+
+  <div class="field" id="fieldKey">
+    <label>OpenAI API Key</label>
+    <input type="password" id="inKey" placeholder="sk-..." autocomplete="off" />
+  </div>
+
+  <div class="field" id="fieldModel">
+    <label>辨識模型</label>
+    <select id="inModel">
+      <option value="gpt-4o">gpt-4o（準確，預設）</option>
+      <option value="gpt-4o-mini">gpt-4o-mini（便宜）</option>
+    </select>
+  </div>
+
+  <div class="field" id="fieldEndpoint" hidden>
+    <label>伺服器網址</label>
+    <input type="url" id="inEndpoint" placeholder="https://furniture-app.onrender.com" autocomplete="off" />
+  </div>
+
+  <div class="note2">
+    直連模式：金鑰存在瀏覽器 localStorage，只會送到 api.openai.com，但前端可見，手機遺失等於金鑰外流。<br/>
+    伺服器模式：金鑰放在 Render 環境變數，前端拿不到，較安全；自架伺服器會自動啟用。
+  </div>
+
+  <button class="btn primary" id="btnSaveCfg" style="margin-top:16px">儲存設定</button>
+  <button class="btn ghost" id="btnTest" style="width:100%;margin-top:9px">測試連線</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 常數與狀態 ================= */
+var CFG_KEY  = 'fa_cfg_v1';
+var HIST_KEY = 'fa_hist_v1';
+var MAX_PHOTO = 4;
+var MAX_SIDE  = 1400;
+
+var photos  = [];
+var current = null;
+var modeCache = null;
+
+var $id = function(n){ return document.getElementById(n); };
+
+/* ================= 設定存取 ================= */
+function getCfg(){
+  var c = {};
+  try { c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}') || {}; } catch(e){ c = {}; }
+  return { mode: c.mode || 'auto', key: c.key || '', model: c.model || 'gpt-4o', endpoint: c.endpoint || '' };
+}
+function setCfg(patch){
+  var c = getCfg();
+  Object.keys(patch).forEach(function(k){ c[k] = patch[k]; });
+  localStorage.setItem(CFG_KEY, JSON.stringify(c));
+  modeCache = null;
+}
+
+/* ================= 小工具 ================= */
+function toast(msg){
+  var t = $id('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function(){ t.classList.remove('show'); }, 2400);
+}
+function fmtDate(d){
+  var p = function(n){ return (n < 10 ? '0' : '') + n; };
+  return d.getFullYear() + '/' + p(d.getMonth()+1) + '/' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function showErr(title, detail, needKey){
+  var box = $id('errBox');
+  box.innerHTML = '<b>' + title + '</b>' + detail +
+    (needKey ? ' <button class="btn ghost small" id="errOpenCfg" style="display:inline-flex;margin-top:8px">開啟設定</button>' : '');
+  box.hidden = false;
+  var b = $id('errOpenCfg');
+  if (b) b.onclick = openSheet;
+}
+function clearErr(){ var b = $id('errBox'); b.hidden = true; b.innerHTML = ''; }
+
+/* ================= 分頁 ================= */
+Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(tab){
+  tab.onclick = function(){
+    Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(t){ t.classList.remove('active'); });
+    tab.classList.add('active');
+    var v = tab.dataset.view;
+    $id('view-scan').hidden = v !== 'scan';
+    $id('view-history').hidden = v !== 'history';
+    if (v === 'history') renderHistory();
+  };
+});
+
+/* ================= 連線方式判定 ================= */
+function detectMode(){
+  var c = getCfg();
+  if (c.mode === 'direct') return Promise.resolve('direct');
+  if (c.mode === 'server') return Promise.resolve('server');
+  if (location.protocol === 'file:' || location.protocol === 'blob:') return Promise.resolve('direct');
+  return fetch('/api/health', { cache: 'no-store' })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ return (j && j.ok) ? 'server' : 'direct'; })
+    .catch(function(){ return 'direct'; });
+}
+function getMode(){
+  if (!modeCache) modeCache = detectMode();
+  return modeCache;
+}
+function refreshHint(){
+  getMode().then(function(m){
+    var c = getCfg();
+    if (m === 'server'){
+      $id('connHint').innerHTML = '連線：<b>自架伺服器</b>，金鑰保存在伺服器端';
+    } else if (c.key){
+      $id('connHint').innerHTML = '連線：<b>OpenAI 直連</b>　模型 ' + c.model;
+    } else {
+      $id('connHint').innerHTML = '尚未設定 API Key，請點右上角齒輪 <b>設定連線</b>';
+    }
+  });
+}
+
+/* ================= 照片 ================= */
+function renderSlots(){
+  var box = $id('slots');
+  box.innerHTML = '';
+  for (var i = 0; i < MAX_PHOTO; i++){
+    var p = photos[i];
+    var d = document.createElement('div');
+    d.className = 'slot' + (p ? ' filled' : '');
+    if (p){
+      d.innerHTML = '<img src="' + p.dataUrl + '" alt="第 ' + (i+1) + ' 張">' +
+        '<span class="no">' + (i+1) + '</span>' +
+        '<button class="del" data-idx="' + i + '" aria-label="刪除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+      (function(img, idx){
+        img.onclick = function(){ $id('lbImg').src = p.dataUrl; $id('lightbox').classList.add('show'); };
+      })(d.querySelector('img'));
+      (function(btn, idx){
+        btn.onclick = function(e){ e.stopPropagation(); photos.splice(idx, 1); renderSlots(); };
+      })(d.querySelector('.del'), i);
+    } else {
+      d.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+      d.onclick = function(){ $id('inputCamera').click(); };
+    }
+    box.appendChild(d);
+  }
+  $id('photoCount').textContent = photos.length + ' / ' + MAX_PHOTO;
+  $id('btnAnalyze').disabled = photos.length === 0;
+}
+
+function loadBitmap(file){
+  if (window.createImageBitmap){
+    return createImageBitmap(file, { imageOrientation: 'from-image' }).catch(function(){
+      return createImageBitmap(file);
+    });
+  }
+  return new Promise(function(res, rej){
+    var img = new Image();
+    img.onload = function(){ res(img); };
+    img.onerror = rej;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function compress(file){
+  return loadBitmap(file).then(function(bmp){
+    var w0 = bmp.width || bmp.naturalWidth;
+    var h0 = bmp.height || bmp.naturalHeight;
+    var scale = Math.min(1, MAX_SIDE / Math.max(w0, h0));
+    var w = Math.round(w0 * scale), h = Math.round(h0 * scale);
+    var cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    var ctx = cv.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(bmp, 0, 0, w, h);
+    var q = 0.82;
+    var out = cv.toDataURL('image/jpeg', q);
+    while (out.length > 900000 && q > 0.5){
+      q -= 0.12;
+      out = cv.toDataURL('image/jpeg', q);
+    }
+    if (bmp.close) bmp.close();
+    return out;
+  });
+}
+
+function addPhotos(fileList){
+  var files = Array.prototype.slice.call(fileList).slice(0, MAX_PHOTO - photos.length);
+  if (!files.length) { toast('最多 ' + MAX_PHOTO + ' 張'); return; }
+  return Promise.all(files.map(function(f){
+    if (!f.type || f.type.indexOf('image/') !== 0) return null;
+    return compress(f).then(function(u){ return { dataUrl: u }; }).catch(function(){ return null; });
+  })).then(function(arr){
+    var ok = arr.filter(Boolean);
+    if (!ok.length) toast('照片讀取失敗，請換一張再試');
+    ok.forEach(function(p){ if (photos.length < MAX_PHOTO) photos.push(p); });
+    renderSlots();
+  });
+}
+
+/* ================= 呼叫 AI ================= */
+var PROMPT = [
+'你是家具檢測 AI。請綜合全部照片判斷，只回傳一個嚴格 JSON 物件，不要任何說明文字、不要 markdown 圍欄。',
+'若畫面中有 A4 紙（21cm × 29.7cm），請以它為比例尺推算家具實際尺寸；若無 A4 紙，依常見家具尺寸估計，並在 description 註明「未見比例尺，尺寸為估計」。',
+'欄位規則：',
+'furnitureType：只能選 [沙發、桌子、衣櫃、床架、櫃體、其他]',
+'length、width、height：數字（公分，只填數字，不帶單位）',
+'material：只能選 [實木、木質板材、金屬、布料、皮革、不清楚]',
+'defect：只能選 [無、刮傷、鬆動、破裂、缺件、發霉/蟲蛀]',
+'overall：只能選 [可正常使用、部分需修復、已無法使用]',
+'description：繁體中文，40 字以內說明瑕疵與外觀狀況',
+'範例：',
+'{"furnitureType":"桌子","length":120,"width":60,"height":75,"material":"實木","defect":"刮傷","overall":"可正常使用","description":"桌面淺刮痕，結構穩定無鬆動"}'
+].join('\n');
+
+function postJSON(url, body, timeout){
+  var ctl = new AbortController();
+  var timer = setTimeout(function(){ ctl.abort(); }, timeout);
+  return fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: ctl.signal
+  }).then(function(r){
+    return r.text().then(function(text){
+      if (!r.ok){
+        var msg = text;
+        try { var j = JSON.parse(text); msg = (j.error && j.error.message) || j.msg || j.message || text; } catch(e){}
+        throw new Error(msg || ('HTTP ' + r.status));
+      }
+      try { return JSON.parse(text); } catch(e){ throw new Error('伺服器回傳的不是 JSON：' + text.slice(0, 100)); }
+    });
+  }).catch(function(err){
+    if (err.name === 'AbortError') throw new Error('連線逾時（' + Math.round(timeout/1000) + ' 秒），請縮小照片或稍後重試');
+    throw err;
+  }).finally(function(){ clearTimeout(timer); });
+}
+
+function parseAIJson(raw){
+  var s = String(raw || '').trim();
+  s = s.replace(/^```[a-zA-Z]*\s*/, '').replace(/```\s*$/, '').trim();
+  var a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if (a < 0 || b < 0) throw new Error('AI 沒有回傳可解析的內容，請重試一次');
+  try { return JSON.parse(s.slice(a, b + 1)); }
+  catch(e){ throw new Error('AI 回傳格式異常，請重試一次'); }
+}
+
+function callOpenAI(c, imgs){
+  var content = [{ type: 'text', text: PROMPT }];
+  imgs.forEach(function(u){ content.push({ type: 'image_url', image_url: { url: u, detail: 'high' } }); });
+  var ctl = new AbortController();
+  var timer = setTimeout(function(){ ctl.abort(); }, 60000);
+  return fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + c.key },
+    body: JSON.stringify({
+      model: c.model || 'gpt-4o',
+      messages: [{ role: 'user', content: content }],
+      temperature: 0.2,
+      max_tokens: 400
+    }),
+    signal: ctl.signal
+  }).then(function(r){
+    return r.text().then(function(text){
+      if (!r.ok){
+        var msg = text;
+        try { var j = JSON.parse(text); msg = (j.error && j.error.message) || text; } catch(e){}
+        throw new Error(msg);
+      }
+      var j = JSON.parse(text);
+      var out = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+      return parseAIJson(out);
+    });
+  }).catch(function(err){
+    if (err.name === 'AbortError') throw new Error('OpenAI 回應逾時，照片可能太大張');
+    throw err;
+  }).finally(function(){ clearTimeout(timer); });
+}
+
+/* ================= 結果整理 ================= */
+function normalize(d){
+  var d2 = d || {};
+  function num(v){
+    var n = Number(String(v === undefined ? '' : v).replace(/[^0-9.\-]/g, ''));
+    return isFinite(n) ? Math.round(n * 10) / 10 : 0;
+  }
+  function pick(v, list, fb){
+    var t = String(v === undefined ? '' : v).trim();
+    if (list.indexOf(t) >= 0) return t;
+    for (var i = 0; i < list.length; i++){ if (t.indexOf(list[i]) >= 0) return list[i]; }
+    return fb;
+  }
+  return {
+    furnitureType: pick(d2.furnitureType, ['沙發','桌子','衣櫃','床架','櫃體','其他'], '其他'),
+    length: num(d2.length),
+    width: num(d2.width),
+    height: num(d2.height),
+    material: pick(d2.material, ['實木','木質板材','金屬','布料','皮革','不清楚'], '不清楚'),
+    defect: pick(d2.defect, ['無','刮傷','鬆動','破裂','缺件','發霉/蟲蛀'], '無'),
+    overall: pick(d2.overall, ['可正常使用','部分需修復','已無法使用'], '部分需修復'),
+    description: String(d2.description || '未取得說明').slice(0, 120)
+  };
+}
+
+function showResult(r){
+  current = r;
+  $id('f_type').textContent = r.furnitureType;
+  $id('f_size').innerHTML = r.length + ' × ' + r.width + ' × ' + r.height + ' <span class="unit">公分</span>';
+  $id('f_material').textContent = r.material;
+  $id('f_defect').textContent = r.defect;
+  $id('f_desc').textContent = r.description;
+  var pill = $id('resPill');
+  pill.textContent = r.overall;
+  pill.className = 'pill ' + (r.overall === '可正常使用' ? 'ok' : r.overall === '部分需修復' ? 'warn' : 'bad');
+  $id('resultCard').hidden = false;
+  $id('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ================= 主流程 ================= */
+function analyze(){
+  clearErr();
+  var t0 = Date.now();
+  $id('loadingText').textContent = 'AI 正在比對 A4 比例尺…';
+  $id('loading').hidden = false;
+  $id('btnAnalyze').disabled = true;
+  $id('resultCard').hidden = true;
+
+  var imgs = photos.map(function(p){ return p.dataUrl; });
+
+  getMode().then(function(m){
+    if (m === 'server'){
+      var c = getCfg();
+      var base = c.endpoint.replace(/\/$/, '');
+      return postJSON(base + '/api/scan', { images: imgs }, 60000);
+    }
+    var c2 = getCfg();
+    if (!c2.key) throw new Error('NO_KEY');
+    return callOpenAI(c2, imgs);
+  }).then(function(data){
+    if (!data || typeof data !== 'object') throw new Error('回傳內容為空');
+    showResult(normalize(data));
+    toast('辨識完成，用時 ' + Math.round((Date.now() - t0) / 1000) + ' 秒');
+  }).catch(function(err){
+    var msg = err && err.message ? err.message : String(err);
+    if (msg === 'NO_KEY'){
+      showErr('還沒設定 API Key', '請在設定中貼上 OpenAI 金鑰，或改用自架伺服器模式。', true);
+      return;
+    }
+    if (/401|invalid.*api.*key|incorrect api key/i.test(msg)){
+      showErr('金鑰無效', 'OpenAI 拒絕了這組金鑰，請確認沒有貼到空白或多餘字元。', true);
+      return;
+    }
+    if (/429|quota|billing|insufficient/i.test(msg)){
+      showErr('額度不足或請求太頻繁', '請到 OpenAI 後台確認餘額，或等一下再試。');
+      return;
+    }
+    if (/Failed to fetch|NetworkError|Load failed/i.test(msg)){
+      showErr('連不到伺服器', '請確認網路，或設定頁的伺服器網址是否正確。', true);
+      return;
+    }
+    showErr('辨識失敗', msg);
+  }).finally(function(){
+    $id('loading').hidden = true;
+    $id('btnAnalyze').disabled = photos.length === 0;
+  });
+}
+
+/* ================= 紀錄 ================= */
+function loadHist(){
+  try { return JSON.parse(localStorage.getItem(HIST_KEY) || '[]') || []; } catch(e){ return []; }
+}
+function saveHist(list){
+  try {
+    localStorage.setItem(HIST_KEY, JSON.stringify(list));
+    return true;
+  } catch(e){
+    while (list.length > 1){
+      list.pop();
+      try { localStorage.setItem(HIST_KEY, JSON.stringify(list)); return true; } catch(e2){}
+    }
+    return false;
+  }
+}
+function thumb(dataUrl){
+  return loadBitmap(dataUrl).catch(function(){
+    return new Promise(function(res, rej){
+      var im = new Image(); im.onload = function(){ res(im); }; im.onerror = rej; im.src = dataUrl;
+    });
+  }).then(function(bmp){
+    var w0 = bmp.width || bmp.naturalWidth, h0 = bmp.height || bmp.naturalHeight;
+    var s = Math.min(1, 320 / Math.max(w0, h0));
+    var cv = document.createElement('canvas');
+    cv.width = Math.round(w0 * s); cv.height = Math.round(h0 * s);
+    cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+    if (bmp.close) bmp.close();
+    return cv.toDataURL('image/jpeg', 0.62);
+  });
+}
+
+function saveCurrent(){
+  if (!current) return;
+  var sizeText = $id('f_size').innerText.trim().replace(/\s+/g, ' ');
+  var rec = {
+    date: fmtDate(new Date()),
+    furnitureType: $id('f_type').innerText.trim(),
+    sizeText: sizeText,
+    material: $id('f_material').innerText.trim(),
+    defect: $id('f_defect').innerText.trim(),
+    overall: $id('resPill').textContent,
+    description: $id('f_desc').innerText.trim(),
+    thumbs: []
+  };
+  Promise.all(photos.map(function(p){ return thumb(p.dataUrl).catch(function(){ return null; }); }))
+    .then(function(ts){
+      rec.thumbs = ts.filter(Boolean);
+      var list = loadHist();
+      list.unshift(rec);
+      if (list.length > 40) list = list.slice(0, 40);
+      var ok = saveHist(list);
+      updateHistCount();
+      toast(ok ? '已儲存這筆紀錄' : '儲存空間不足，請先清空部分舊紀錄');
+    });
+}
+function updateHistCount(){ $id('histCount').textContent = loadHist().length; }
+
+function renderHistory(){
+  var list = loadHist();
+  var box = $id('historyList');
+  updateHistCount();
+  box.innerHTML = '';
+  $id('emptyState').style.display = list.length ? 'none' : 'block';
+  list.forEach(function(r, idx){
+    var card = document.createElement('div');
+    card.className = 'h-item';
+    card.innerHTML =
+      '<div class="h-top"><div><p class="h-date">' + r.date + '</p>' +
+      '<p class="h-title">' + escapeHtml(r.furnitureType) + '　<span style="font-weight:500;font-size:13px;color:#7B7167">' + escapeHtml(r.sizeText) + '</span></p></div>' +
+      '<span class="pill">' + escapeHtml(r.overall) + '</span></div>' +
+      '<p class="h-meta">材質：' + escapeHtml(r.material) + '｜瑕疵：' + escapeHtml(r.defect) + '</p>' +
+      '<p class="h-meta">' + escapeHtml(r.description) + '</p>' +
+      '<div class="h-imgs">' + (r.thumbs || []).map(function(t){ return '<img src="' + t + '" alt="">'; }).join('') + '</div>' +
+      '<div class="h-foot"><span style="font-size:11.5px;color:#A99C8C">#' + (list.length - idx) + '</span>' +
+      '<button class="btn danger small" data-del="' + idx + '">刪除</button></div>';
+    box.appendChild(card);
+  });
+  Array.prototype.forEach.call(box.querySelectorAll('[data-del]'), function(btn){
+    btn.onclick = function(){
+      if (!confirm('確定刪除這筆紀錄？')) return;
+      var l = loadHist();
+      l.splice(Number(btn.dataset.del), 1);
+      saveHist(l);
+      renderHistory();
+    };
+  });
+}
+function escapeHtml(s){
+  return String(s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/* ================= 匯出 ================= */
+function csvCell(v){
+  var s = String(v === undefined ? '' : v);
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+function exportCSV(){
+  var list = loadHist();
+  if (!list.length) { toast('目前沒有可匯出的紀錄'); return; }
+  var head = ['時間', '家具類型', '尺寸', '主要材質', '瑕疵', '整體狀況', '說明'];
+  var rows = list.map(function(r){
+    return [r.date, r.furnitureType, r.sizeText, r.material, r.defect, r.overall, r.description].map(csvCell).join(',');
+  });
+  var csv = '\uFEFF' + head.map(csvCell).join(',') + '\n' + rows.join('\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '家具辨識紀錄_' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1200);
+  toast('已匯出 ' + list.length + ' 筆');
+}
+
+/* ================= 設定面板 ================= */
+function openSheet(){
+  var c = getCfg();
+  $id('inKey').value = c.key;
+  $id('inModel').value = c.model;
+  $id('inEndpoint').value = c.endpoint;
+  setSeg(c.mode);
+  $id('overlay').classList.add('show');
+  $id('sheet').classList.add('show');
+}
+function closeSheet(){
+  $id('overlay').classList.remove('show');
+  $id('sheet').classList.remove('show');
+}
+function setSeg(mode){
+  Array.prototype.forEach.call($id('segMode').children, function(b){
+    b.classList.toggle('on', b.dataset.mode === mode);
+  });
+  $id('fieldEndpoint').hidden = mode !== 'server';
+  $id('fieldKey').hidden = mode === 'server';
+  $id('fieldModel').hidden = mode === 'server';
+}
+Array.prototype.forEach.call($id('segMode').children, function(b){
+  b.onclick = function(){ setSeg(b.dataset.mode); };
+});
+
+/* ================= 測試連線 ================= */
+function currentSegMode(){
+  var on = $id('segMode').querySelector('.on');
+  return on ? on.dataset.mode : 'auto';
+}
+function testConn(){
+  var m = currentSegMode();
+  var key = $id('inKey').value.trim();
+  var ep = $id('inEndpoint').value.trim().replace(/\/$/, '');
+  if (m === 'server'){
+    if (!ep) { toast('請先填伺服器網址'); return; }
+    fetch(ep + '/api/health', { cache: 'no-store' })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ toast(j && j.ok ? '伺服器正常' + (j.hasKey ? '，金鑰已設定' : '，但尚未設定金鑰') : '伺服器回應異常'); })
+      .catch(function(){ toast('連不到這個網址'); });
+    return;
+  }
+  if (!key) { toast('請先貼上 API Key'); return; }
+  fetch('https://api.openai.com/v1/models', { headers: { 'Authorization': 'Bearer ' + key } })
+    .then(function(r){ toast(r.ok ? '金鑰可用' : '金鑰無效（HTTP ' + r.status + '）'); })
+    .catch(function(){ toast('連不到 OpenAI，請檢查網路'); });
+}
+
+/* ================= 事件綁定 ================= */
+$id('btnCamera').onclick = function(){
+  if (photos.length >= MAX_PHOTO) { toast('最多 4 張'); return; }
+  $id('inputCamera').value = '';
+  $id('inputCamera').click();
+};
+$id('btnAlbum').onclick = function(){
+  if (photos.length >= MAX_PHOTO) { toast('最多 4 張'); return; }
+  $id('inputAlbum').value = '';
+  $id('inputAlbum').click();
+};
+$id('inputCamera').onchange = function(e){ addPhotos(e.target.files); };
+$id('inputAlbum').onchange = function(e){ addPhotos(e.target.files); };
+$id('btnAnalyze').onclick = analyze;
+$id('btnSave').onclick = saveCurrent;
+$id('btnReset').onclick = function(){
+  photos = []; current = null;
+  renderSlots();
+  $id('resultCard').hidden = true;
+  clearErr();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+$id('btnExport').onclick = exportCSV;
+$id('btnClearAll').onclick = function(){
+  if (!loadHist().length) { toast('目前沒有紀錄'); return; }
+  if (!confirm('清空全部紀錄？此動作無法復原')) return;
+  localStorage.removeItem(HIST_KEY);
+  renderHistory();
+  toast('已清空');
+};
+$id('btnSettings').onclick = openSheet;
+$id('overlay').onclick = closeSheet;
+$id('lbClose').onclick = function(){ $id('lightbox').classList.remove('show'); };
+$id('lightbox').onclick = function(e){ if (e.target === $id('lightbox')) $id('lightbox').classList.remove('show'); };
+$id('btnSaveCfg').onclick = function(){
+  var mode = currentSegMode();
+  var key = $id('inKey').value.trim();
+  var ep = $id('inEndpoint').value.trim().replace(/\/$/, '');
+  if (mode !== 'server' && key && !/^sk-/.test(key)) { toast('金鑰格式看起來不對，通常是 sk- 開頭'); }
+  setCfg({ mode: mode, key: key, model: $id('inModel').value, endpoint: ep });
+  refreshHint();
+  closeSheet();
+  toast('設定已儲存');
+};
+$id('btnTest').onclick = testConn;
+
+/* ================= 啟動 ================= */
+renderSlots();
+updateHistCount();
+refreshHint();
+</script>
+</body>
+</html>

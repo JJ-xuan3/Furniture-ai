@@ -1,0 +1,18 @@
+{
+  "name": "furniture-ai-scanner",
+  "version": "1.0.0",
+  "private": true,
+  "description": "家具 AI 辨識系統：手機拍照 + A4 比例尺 + GPT-4o 尺寸估算",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
